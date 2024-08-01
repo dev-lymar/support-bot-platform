@@ -1,4 +1,5 @@
 aiogram==3.10.0
 fastapi==0.111.1
+redis==5.0.8
 sqlalchemy==2.0.31
 uvicorn==0.30.3
