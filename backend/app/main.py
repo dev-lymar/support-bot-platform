@@ -1,7 +1,7 @@
 import os
 import logging
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends
 from pydantic import BaseModel
 import httpx
 import uvicorn
@@ -86,11 +86,19 @@ async def create_question(request: QuestionRequest):
                 logger.info(f"Creating forum topic with message_id={message_id}")
                 forum_topic_response = await client.post(f"{BOT_API_URL}/createForumTopic", json={
                     "chat_id": GROUP_CHAT_ID,
-                    "name": f"Dialogue with {user_name}"
+                    "name": f"Dialogue with {user_name}",
+                    "icon_color": 0x6FB9F0
                 })
 
                 forum_topic_response.raise_for_status()
                 logger.info(f"Forum topic created successfully. Response: {forum_topic_response.json()}")
+
+                topic_id = forum_topic_response.json()["result"]["message_thread_id"]
+                await client.post(f"{BOT_API_URL}/sendMessage", json={
+                    "chat_id": GROUP_CHAT_ID,
+                    "message_thread_id": topic_id,
+                    "text": topic_text
+                })
 
                 # Saving the message in Redis
                 await redis_client.rpush(f"user:{user_id}:messages", topic_text)
