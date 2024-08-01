@@ -40,7 +40,11 @@ async def handle_group_message(message: types.Message):
                 if user_id:
                     await bot.send_message(user_id, f"Manager replied:\n\n{message.text}")
                     async with httpx.AsyncClient() as client:
-                        await client.post(f"{WS_URL}/ws/{user_id}", json={"message": message.text})
+                        response = await client.post(f"{WS_URL}/ws/{user_id}", json={"message": message.text})
+                        if response.status_code == 200:
+                            logger.info(f"Message successfully send to user {user_id}")
+                        else:
+                            logger.error(f"Failed to send message to user {user_id}: {response.text}")
 
 
 # Helper function to extract the question ID from the message
