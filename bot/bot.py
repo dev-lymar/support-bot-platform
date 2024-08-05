@@ -5,6 +5,7 @@ from aiogram import Bot, Dispatcher, types
 from dotenv import load_dotenv
 import websockets
 import redis.asyncio as redis
+import httpx
 
 load_dotenv()
 
@@ -12,6 +13,7 @@ API_TOKEN = os.getenv("API_TOKEN")
 GROUP_CHAT_ID = os.getenv("GROUP_CHAT_ID")
 WS_URL = os.getenv("WS_URL")
 REDIS_URL = os.getenv("REDIS_URL")
+BOT_API_URL = f"https://api.telegram.org/bot{API_TOKEN}"
 
 # Logging Setup
 logging.basicConfig(level=logging.INFO)
@@ -25,6 +27,17 @@ dp = Dispatcher()
 redis_client = redis.from_url(REDIS_URL)
 
 
+async def update_topic_title(topic_id: int, new_title: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.post(f"{BOT_API_URL}/editForumTopic", json={
+            "chat_id": GROUP_CHAT_ID,
+            "message_thread_id": topic_id,
+            "name": new_title
+        })
+        response.raise_for_status()
+        logger.info(f"Updated topic title to: {new_title}")
+
+
 @dp.message(lambda message: message.chat.type == "supergroup")
 async def handle_group_message(message: types.Message):
     if message.chat.id == int(GROUP_CHAT_ID):
@@ -33,14 +46,17 @@ async def handle_group_message(message: types.Message):
         if message.is_topic_message:
             topic_id = message.message_thread_id
 
-            # Retrieve question_id and user_id from Redis
+            # Retrieve question_id, user_id, and user_name from Redis
             question_id = await redis_client.get(f"topic:{topic_id}:question_id")
             user_id = await redis_client.get(f"topic:{topic_id}:user_id")
+            user_name = await redis_client.get(f"user:{user_id.decode('utf-8')}:name")
 
-            if question_id and user_id:
+            if question_id and user_id and user_name:
                 question_id = question_id.decode('utf-8')
                 user_id = user_id.decode('utf-8')
-                logger.info(f"Found question_id: {question_id} and user_id: {user_id} for topic_id: {topic_id}")
+                user_name = user_name.decode('utf-8')
+                logger.info(f"Found question_id: {question_id}, user_id: {user_id}, and "
+                            f"user_name: {user_name} for topic_id: {topic_id}")
 
                 ws_url = f"{WS_URL}/ws/{user_id}"
                 logger.info(f"Connecting to WebSocket URL: {ws_url}")
@@ -49,6 +65,9 @@ async def handle_group_message(message: types.Message):
                     async with websockets.connect(ws_url) as websocket:
                         await websocket.send(message.text)
                         logger.info(f"Message sent to user {user_id} via WebSocket")
+
+                        new_title = f"\U0001F7E2 Dialogue with {user_name}"
+                        await update_topic_title(topic_id, new_title)
                 except Exception as e:
                     logger.error(f"Failed to send message to user {user_id} via WebSocket: {e}")
             else:

@@ -87,7 +87,7 @@ async def create_question(request: QuestionRequest):
         try:
             forum_topic_response = await client.post(f"{BOT_API_URL}/createForumTopic", json={
                 "chat_id": GROUP_CHAT_ID,
-                "name": f"Dialogue with {user_name}",
+                "name": f"\U0001F534 Dialogue with {user_name}",
                 "icon_color": 0x6FB9F0
             })
             forum_topic_response.raise_for_status()
@@ -102,6 +102,7 @@ async def create_question(request: QuestionRequest):
 
             await redis_client.set(f"topic:{topic_id}:question_id", question_id, ex=DEFAULT_TTL)
             await redis_client.set(f"topic:{topic_id}:user_id", user_id, ex=DEFAULT_TTL)
+            await redis_client.set(f"user:{user_id}:name", user_name, ex=DEFAULT_TTL)
 
             await redis_client.rpush(f"user:{user_id}:messages", topic_text)
             await redis_client.expire(f"user:{user_id}:messages", DEFAULT_TTL)
